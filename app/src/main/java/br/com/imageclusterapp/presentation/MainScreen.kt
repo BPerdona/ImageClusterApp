@@ -137,7 +137,7 @@ private fun ButtonAndClusterInput(
         ) {
             TextField(
                 modifier = Modifier.width(120.dp),
-                value = if (clusters == null) "" else clusters.toString(),
+                value = clusters?.toString() ?: "",
                 onValueChange = {
                     onValueChange(it)
                 },
