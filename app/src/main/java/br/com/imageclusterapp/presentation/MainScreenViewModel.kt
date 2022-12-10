@@ -20,7 +20,7 @@ import smile.clustering.kmeans
 import java.io.InputStream
 import androidx.compose.ui.graphics.Color as uiColor
 
-class MainScreenViewModel(application: Application): AndroidViewModel(application) {
+class MainScreenViewModel(application: Application) : AndroidViewModel(application) {
 
     data class ViewState(
         val imageBitmap: ImageBitmap? = null,
@@ -37,8 +37,8 @@ class MainScreenViewModel(application: Application): AndroidViewModel(applicatio
     private val _clusters = MutableStateFlow<Int?>(3)
     val clusters = _clusters.asStateFlow()
 
-    fun setImageUri(uri: Uri){
-        viewModelScope.launch(Dispatchers.IO){
+    fun setImageUri(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
             getContext().contentResolver.let { contentResolver: ContentResolver ->
                 val readUriPermission: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION
                 contentResolver.takePersistableUriPermission(uri, readUriPermission)
@@ -59,8 +59,8 @@ class MainScreenViewModel(application: Application): AndroidViewModel(applicatio
         }
     }
 
-    private fun clusterImage(imageBitmap: ImageBitmap){
-        viewModelScope.launch(Dispatchers.IO){
+    private fun clusterImage(imageBitmap: ImageBitmap) {
+        viewModelScope.launch(Dispatchers.IO) {
 
             val startTime = System.currentTimeMillis()
             _viewState.update {
@@ -72,8 +72,8 @@ class MainScreenViewModel(application: Application): AndroidViewModel(applicatio
             val bitmap = imageBitmap.asAndroidBitmap()
             val height = bitmap.height
             val width = bitmap.width
-            val pixels = IntArray(height*width)
-            bitmap.getPixels(pixels,0, width, 0, 0, width, height)
+            val pixels = IntArray(height * width)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
             _viewState.update {
                 it.copy(
@@ -82,7 +82,7 @@ class MainScreenViewModel(application: Application): AndroidViewModel(applicatio
             }
 
             // Collecting color from pixels
-            val data = arrayOfNulls<DoubleArray>(height*width)
+            val data = arrayOfNulls<DoubleArray>(height * width)
             pixels.forEachIndexed { index, value ->
                 val color = uiColor(pixels[index])
                 data[index] = doubleArrayOf(
@@ -100,14 +100,14 @@ class MainScreenViewModel(application: Application): AndroidViewModel(applicatio
 
             // Start KMeans
             val nClusters = if (_clusters.value == 1) 3 else _clusters.value
-            val result = kmeans(data.requireNoNulls(), nClusters?:3, 80)
+            val result = kmeans(data.requireNoNulls(), nClusters ?: 3, 80)
 
             // Getting centroids List
             val centroids: MutableList<uiColor> = mutableListOf()
             result.centroids.forEachIndexed { index, centroid ->
                 val (r, g, b) = centroid
                 centroids.add(uiColor(red = r.toFloat(), green = g.toFloat(), blue = b.toFloat()))
-                Log.e("tag","Centroid $index -> R: $r | G: $g | B: $b")
+                Log.e("tag", "Centroid $index -> R: $r | G: $g | B: $b")
             }
 
             _viewState.update {
@@ -144,25 +144,24 @@ class MainScreenViewModel(application: Application): AndroidViewModel(applicatio
                     enableButton = true,
                     currentText = "",
                     clusteredImage = newBitmap.asImageBitmap(),
-                    processingTime = endTime-startTime
+                    processingTime = endTime - startTime
                 )
             }
         }
     }
 
-    fun setClusterInput(clusters: String){
+    fun setClusterInput(clusters: String) {
         if (clusters.isBlank())
-            _clusters.value=null
+            _clusters.value = null
         try {
             val castCluster = clusters.toInt()
-            if (castCluster<=0 || castCluster>100){
+            if (castCluster <= 0 || castCluster > 100) {
                 return
             }
             _clusters.value = castCluster
-        }catch (e: Exception){
+        } catch (e: Exception) {
             return
         }
-
     }
 
     private fun getContext(): Context = getApplication<Application>().applicationContext

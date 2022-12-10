@@ -1,13 +1,12 @@
 package br.com.imageclusterapp.presentation
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,15 +25,26 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.blue
 import androidx.core.graphics.green
 import androidx.core.graphics.red
+import kotlinx.coroutines.launch
 
 
 @Composable
-fun MainScreen(viewModel: MainScreenViewModel, onButtonClick: () -> Unit) {
+fun MainScreen(
+    viewModel: MainScreenViewModel,
+    onOpenGallery: () -> Unit,
+    onImageSave: (bmp: Bitmap) -> Unit
+) {
     val viewState by viewModel.viewState.collectAsState()
     val clusters by viewModel.clusters.collectAsState(initial = 3)
     val scrollState = rememberScrollState()
+    val scaffoldState = rememberScaffoldState()
+    val scope = rememberCoroutineScope()
+    var imageSaved by remember {
+        mutableStateOf(false)
+    }
 
     Scaffold(
+        scaffoldState = scaffoldState,
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
@@ -46,7 +57,7 @@ fun MainScreen(viewModel: MainScreenViewModel, onButtonClick: () -> Unit) {
                 ) {
                     Text(
                         text = "Image Cluster",
-                        color=Color.Black,
+                        color = Color.Black,
                         textAlign = TextAlign.Center,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.SemiBold
@@ -61,7 +72,7 @@ fun MainScreen(viewModel: MainScreenViewModel, onButtonClick: () -> Unit) {
                 .background(Color.White)
                 .fillMaxSize(),
             contentAlignment = Alignment.TopCenter
-        ){
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -70,12 +81,25 @@ fun MainScreen(viewModel: MainScreenViewModel, onButtonClick: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                
+
                 SelectedImage(imageBitmap = viewState.imageBitmap)
 
-                ProgressionIndicator(enableButton = viewState.enableButton, currentText = viewState.currentText)
+                ProgressionIndicator(
+                    enableButton = viewState.enableButton,
+                    currentText = viewState.currentText
+                )
 
-                PreviewClusteredImage(clusteredImage = viewState.clusteredImage)
+                PreviewClusteredImage(
+                    clusteredImage = viewState.clusteredImage,
+                    onSaveImage = {
+                        onImageSave(it)
+                        imageSaved = true
+                        scope.launch {
+                            scaffoldState.snackbarHostState.showSnackbar("Image saved")
+                        }
+                    },
+                    imageSaved = imageSaved,
+                )
 
                 TimeAndColorList(
                     clusteredImage = viewState.clusteredImage,
@@ -87,10 +111,13 @@ fun MainScreen(viewModel: MainScreenViewModel, onButtonClick: () -> Unit) {
                     enableButton = viewState.enableButton,
                     clusters = clusters,
                     onValueChange = viewModel::setClusterInput,
-                    onButtonClick = onButtonClick
+                    onOpenGallery = {
+                        onOpenGallery()
+                        imageSaved = false
+                    }
                 )
 
-                Spacer(modifier = Modifier.height(30.dp))
+                Spacer(modifier = Modifier.height(65.dp))
             }
         }
     }
@@ -101,9 +128,9 @@ private fun ButtonAndClusterInput(
     enableButton: Boolean,
     clusters: Int?,
     onValueChange: (String) -> Unit,
-    onButtonClick: () -> Unit
+    onOpenGallery: () -> Unit
 ) {
-    if(enableButton) {
+    if (enableButton) {
         Row(
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.Bottom
@@ -134,9 +161,7 @@ private fun ButtonAndClusterInput(
                     backgroundColor = Color.White,
                     contentColor = Color.Black
                 ),
-                onClick = {
-                    onButtonClick()
-                },
+                onClick = onOpenGallery,
             ) {
                 Text(text = "Pick Photo")
             }
@@ -150,7 +175,7 @@ private fun TimeAndColorList(
     processingTime: Long,
     centroids: List<Color>
 ) {
-    if (clusteredImage != null){
+    if (clusteredImage != null) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -167,27 +192,32 @@ private fun TimeAndColorList(
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(10.dp))
-            for (it in centroids){
+            for (it in centroids) {
                 val hexColor = it.toArgb()
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier
-                        .padding(5.dp)
-                        .padding(start = 10.dp)
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .border(
-                            width = 1.dp,
-                            color = Color.Black,
-                            RoundedCornerShape(14.dp)
-                        )
-                        .background(it)
+                    Box(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .padding(start = 10.dp)
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(
+                                width = 1.dp,
+                                color = Color.Black,
+                                RoundedCornerShape(14.dp)
+                            )
+                            .background(it)
                     )
                     Text(
-                        text = "RGB -> Red %03d | Green %03d | Blue %03d".format(hexColor.red, hexColor.green, hexColor.blue),
+                        text = "RGB -> Red %03d | Green %03d | Blue %03d".format(
+                            hexColor.red,
+                            hexColor.green,
+                            hexColor.blue
+                        ),
                         color = Color.Black,
                         fontSize = 16.sp
                     )
@@ -198,7 +228,11 @@ private fun TimeAndColorList(
 }
 
 @Composable
-private fun PreviewClusteredImage(clusteredImage: ImageBitmap?) {
+private fun PreviewClusteredImage(
+    imageSaved: Boolean,
+    clusteredImage: ImageBitmap?,
+    onSaveImage: (bmp: Bitmap) -> Unit
+) {
     if (clusteredImage != null) {
         Divider(
             modifier = Modifier.padding(horizontal = 10.dp),
@@ -212,25 +246,48 @@ private fun PreviewClusteredImage(clusteredImage: ImageBitmap?) {
             bitmap = clusteredImage,
             contentDescription = "Galery Image"
         )
+        if (!imageSaved)
+            Button(
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color.White,
+                    contentColor = Color.Black
+                ),
+                onClick = {
+                    onSaveImage(clusteredImage.asAndroidBitmap())
+                },
+                modifier = Modifier
+                    .padding(bottom = 20.dp)
+                    .scale(1.1f)
+            ) {
+                Text(text = "Save Image")
+            }
+        else
+            Text(
+                modifier = Modifier.padding(bottom = 20.dp),
+                text = "Image successfully saved",
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF4CAF50),
+                fontSize = 18.sp
+            )
     }
 }
 
 @Composable
 private fun ProgressionIndicator(enableButton: Boolean, currentText: String) {
-    if(!enableButton){
+    if (!enableButton) {
         Spacer(modifier = Modifier.height(16.dp))
         Text(text = currentText, color = Color.Black, fontSize = 19.sp)
         Spacer(modifier = Modifier.height(30.dp))
         CircularProgressIndicator(
             modifier = Modifier.scale(1.2f),
-            color = Color(0xFF487E3D)
+            color = Color(0xFF3EA040)
         )
     }
 }
 
 @Composable
 private fun SelectedImage(imageBitmap: ImageBitmap?) {
-    if (imageBitmap != null){
+    if (imageBitmap != null) {
         Image(
             modifier = Modifier
                 .padding(20.dp)
@@ -253,8 +310,8 @@ private fun SelectedImage(imageBitmap: ImageBitmap?) {
     }
 }
 
-private fun convertTime(ms: Long): String{
-    val sec = (ms/1000)%60
-    val min = (ms/60000)%60
+private fun convertTime(ms: Long): String {
+    val sec = (ms / 1000) % 60
+    val min = (ms / 60000) % 60
     return "$min min | $sec sec."
 }
